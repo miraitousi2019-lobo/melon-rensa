@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>メロン連鎖 大繁盛！ v1.0.0</title>
+<style>
+  :root {
+    --bg: #fff6e3;
+    --ink: #3b2a14;
+    --sub: #8a6f4a;
+    --panel: #ffffff;
+    --line: #e6d3ac;
+    --accent: #f08a1c;
+    --green: #2f8048;
+    --field: #173a26;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--ink);
+    font-family: "Hiragino Maru Gothic ProN", "BIZ UDPGothic", "Yu Gothic UI", "Meiryo", sans-serif;
+    user-select: none; -webkit-user-select: none;
+    touch-action: manipulation; overscroll-behavior: none;
+  }
+  body { display: flex; flex-direction: column; height: 100dvh; }
+
+  #top {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px; border-bottom: 2px solid var(--line); background: var(--panel);
+  }
+  #top h1 { font-size: 16px; margin: 0; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #top h1 small { font-size: 11px; color: var(--sub); font-weight: normal; margin-left: 6px; }
+  .iconBtn {
+    border: 2px solid var(--line); background: var(--bg); color: var(--ink);
+    border-radius: 10px; font-size: 18px; width: 42px; height: 36px; padding: 0; cursor: pointer;
+  }
+
+  #main { flex: 1; display: flex; justify-content: center; align-items: center; gap: 10px; padding: 8px; min-height: 0; }
+  #fieldWrap { position: relative; border: 4px solid #7a5a2c; border-radius: 10px; background: var(--field); line-height: 0; box-shadow: 0 4px 0 #5b4220; }
+  #field { display: block; border-radius: 6px; touch-action: none; }
+
+  #banner {
+    position: absolute; left: 0; right: 0; top: 30%; text-align: center; pointer-events: none;
+    line-height: 1.25; opacity: 0;
+  }
+  #banner b { display: block; font-size: 30px; color: #fff; text-shadow: 0 0 6px #f08a1c, 0 3px 0 #b8560a, 0 0 14px #f08a1c; }
+  #banner span { display: block; font-size: 20px; font-weight: bold; color: #fff8c9; text-shadow: 0 2px 0 #1b4a2c, 0 0 8px #000; padding: 0 4px; }
+  #banner.show { animation: pop 1.2s ease-out forwards; }
+  @keyframes pop {
+    0% { opacity: 0; transform: scale(.4); }
+    15% { opacity: 1; transform: scale(1.2); }
+    28% { transform: scale(1); }
+    80% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-18px); }
+  }
+  #toast {
+    position: absolute; left: 6px; right: 6px; top: 8px; text-align: center; pointer-events: none;
+    background: rgba(255, 246, 227, .95); color: var(--ink); border-radius: 8px; padding: 6px 4px;
+    font-size: 14px; font-weight: bold; line-height: 1.3; opacity: 0;
+  }
+  #toast.show { animation: toast 2.2s ease-out forwards; }
+  @keyframes toast { 0% { opacity: 0; } 10% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
+
+  #side { width: 92px; display: flex; flex-direction: column; gap: 8px; align-self: stretch; justify-content: flex-start; }
+  .box { background: var(--panel); border: 2px solid var(--line); border-radius: 10px; padding: 6px; text-align: center; }
+  .box .lbl { font-size: 11px; color: var(--sub); }
+  .box .val { font-size: 18px; font-weight: bold; font-variant-numeric: tabular-nums; }
+  #next { display: block; margin: 2px auto 0; }
+
+  #pad { display: none; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 12px calc(10px + env(safe-area-inset-bottom)); }
+  body.touch #pad { display: flex; }
+  #pad .grp { display: flex; gap: 8px; }
+  #pad button {
+    border: none; border-radius: 16px; background: var(--green); color: #fff; font-size: 22px; font-weight: bold;
+    width: 60px; height: 60px; box-shadow: 0 4px 0 #1b5230; touch-action: none; font-family: inherit;
+  }
+  #pad button:active, #pad button.on { transform: translateY(3px); box-shadow: 0 1px 0 #1b5230; }
+  #pad button.rot { background: var(--accent); box-shadow: 0 4px 0 #b8560a; width: 88px; font-size: 18px; }
+  #pad button.hard { background: #7a5a2c; box-shadow: 0 4px 0 #4f3a1a; font-size: 14px; }
+  #keys { display: block; text-align: center; font-size: 12px; color: var(--sub); padding: 0 8px 8px; }
+  body.touch #keys { display: none; }
+
+  #overlay {
+    position: fixed; inset: 0; z-index: 10; background: rgba(59, 42, 20, .72);
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+  }
+  #overlay.hide { display: none; }
+  #card {
+    background: var(--bg); border: 4px solid var(--accent); border-radius: 18px; padding: 20px 18px;
+    max-width: 380px; width: 100%; text-align: center; max-height: 100%; overflow: auto;
+  }
+  #card h2 { margin: 0 0 6px; font-size: 26px; color: var(--green); }
+  #card p { margin: 6px 0; font-size: 14px; line-height: 1.6; }
+  #card .big { font-size: 22px; font-weight: bold; }
+  #card ul { text-align: left; font-size: 13px; line-height: 1.7; padding-left: 20px; margin: 8px 0; }
+  #startBtn {
+    margin-top: 10px; border: none; border-radius: 14px; background: var(--accent); color: #fff;
+    font-size: 20px; font-weight: bold; padding: 12px 28px; box-shadow: 0 4px 0 #b8560a; cursor: pointer; font-family: inherit;
+  }
+</style>
+</head>
+<body>
+<div id="top">
+  <h1>🍈 メロン連鎖 大繁盛！<small>v1.0.0</small></h1>
+  <button class="iconBtn" id="soundBtn" title="音">🔊</button>
+  <button class="iconBtn" id="pauseBtn" title="ひとやすみ">⏸</button>
+</div>
+
+<div id="main">
+  <div id="fieldWrap">
+    <canvas id="field"></canvas>
+    <div id="banner"></div>
+    <div id="toast"></div>
+  </div>
+  <div id="side">
+    <div class="box"><div class="lbl">つぎ</div><canvas id="next"></canvas></div>
+    <div class="box"><div class="lbl">売上</div><div class="val" id="vScore">0</div></div>
+    <div class="box"><div class="lbl">最高売上</div><div class="val" id="vBest">0</div></div>
+    <div class="box"><div class="lbl">レベル</div><div class="val" id="vLevel">1</div></div>
+    <div class="box"><div class="lbl">最大連鎖</div><div class="val" id="vChain">0</div></div>
+  </div>
+</div>
+
+<div id="pad">
+  <div class="grp">
+    <button data-act="left">◀</button>
+    <button data-act="down">▼</button>
+    <button data-act="right">▶</button>
+  </div>
+  <div class="grp">
+    <button data-act="hard" class="hard">ドスン</button>
+    <button data-act="rot" class="rot">まわす</button>
+  </div>
+</div>
+<div id="keys">← → うごかす ／ ↑ か X まわす ／ Z 逆まわし ／ ↓ はやく ／ スペース ドスン ／ P ひとやすみ</div>
+
+<div id="overlay">
+  <div id="card">
+    <h2 id="ovTitle">メロン連鎖 大繁盛！</h2>
+    <div id="ovBody">
+      <p>メロンが4個1組で降ってきます。<br><b>同じ種類を5個以上つなげる</b>と売れて消えます。</p>
+      <ul>
+        <li>消えたあと上のメロンが落ちて、また5個つながると<b>連鎖</b></li>
+        <li>連鎖するほど売上アップ。声も派手になります</li>
+        <li>スマホ：下のボタン。画面をなぞって動かす・ポンと触って回すもOK</li>
+        <li>てっぺんまで積もったら「本日売り切れ」</li>
+      </ul>
+    </div>
+    <button id="startBtn">開店する</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+// メロン連鎖 大繁盛！ v1.0.0
+// 4個1組で落ちてくるメロンを、同じ種類5個以上つなげて消す連鎖ゲーム。
+// ネット・合言葉は使わない。記録するのは最高売上だけ（このブラウザの中）。
+
+const VERSION = 'v1.0.0';
+const COLS = 8, ROWS = 15, HIDDEN = 2, VIS = ROWS - HIDDEN;
+const MIN_LINK = 5;          // 何個つながったら消えるか
+const LOCK_MS = 500;         // 着地してから固まるまで
+const CLEAR_MS = 560;        // 消える演出の長さ
+const FALL_SPEED = 0.022;    // バラけて落ちる速さ（マス/ミリ秒）
+const LEVEL_EVERY = 25;      // 何個売れたらレベルが上がるか
+const FIFTH_KIND_LEVEL = 3;  // 5種類目（らいでん）が混ざるレベル
+
+const KINDS = [
+  { name: '夕張',     base: '#f6a03c', light: '#ffd596', dark: '#c96a12', net: 'rgba(255,240,210,.75)', pat: 'net' },
+  { name: 'アールス', base: '#6fc7ae', light: '#c9f2e4', dark: '#35806c', net: 'rgba(255,255,255,.8)',  pat: 'net' },
+  { name: 'アンデス', base: '#c4e03a', light: '#f1fba6', dark: '#7f9a12', net: 'rgba(90,120,10,.55)',   pat: 'stripe' },
+  { name: 'プリンス', base: '#f7ecc0', light: '#ffffff', dark: '#cdb873', net: '',                      pat: 'plain' },
+  { name: 'らいでん', base: '#2f8048', light: '#7fcf8f', dark: '#124a25', net: 'rgba(220,255,220,.6)',  pat: 'net' },
+];
+
+// 形。マスの並び順の「前2個」と「後ろ2個」で色が分かれる
+const SHAPES = [
+  { c: [[-1, 0], [0, 0], [1, 0], [2, 0]],  y: 1 },            // 棒
+  { c: [[0, 0], [1, 0], [1, 1], [0, 1]],   y: 0, o: true },   // 四角（時計回りの順）
+  { c: [[-1, 0], [0, 0], [1, 0], [1, -1]], y: 1 },            // L字
+  { c: [[1, 0], [0, 0], [-1, 0], [-1, -1]], y: 1 },           // 逆L字
+  { c: [[-1, 0], [0, 0], [0, -1], [1, -1]], y: 1 },           // カギ形
+  { c: [[1, 0], [0, 0], [0, -1], [-1, -1]], y: 1 },           // 逆カギ形
+  { c: [[-1, 0], [0, 0], [1, 0], [0, -1]], y: 1 },            // 凸
+];
+const KICKS = [[0, 0], [-1, 0], [1, 0], [-2, 0], [2, 0], [0, -1]];
+
+const CHAIN_LINES = ['仕入れ完了！', 'いそがしやー', '大量注文きたっちゃ', 'メロンのお祭りや', '大繁盛！'];
+
+// ---------- 画面の部品 ----------
+const $ = id => document.getElementById(id);
+const fieldCv = $('field'), fctx = fieldCv.getContext('2d');
+const nextCv = $('next'), nctx = nextCv.getContext('2d');
+const banner = $('banner'), toast = $('toast'), overlay = $('overlay');
+
+const isTouch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+if (isTouch) document.body.classList.add('touch');
+
+// ---------- ゲームの状態 ----------
+let grid, off;               // grid[r][c] = メロンの種類（-1は空） / off = 落下中のずれ（マス）
+let piece = null, next = null;
+let phase = 'title';         // title / fall / settle / clear / over
+let paused = false;
+let chain = 0, maxChain = 0, score = 0, best = 0, level = 1, cleared = 0;
+let dropTimer = 0, lockTimer = 0, lockResets = 0, clearTimer = 0;
+let clearing = [], clearingSet = new Set();
+let settleMoved = false;
+let particles = [];
+let soundOn = true;
+
+let cell = 32, dpr = 1, sprites = [], miniSprites = [], miniCell = 18;
+
+try { best = parseInt(localStorage.getItem('melonRensaBest') || '0', 10) || 0; } catch (e) { best = 0; }
+
+// ---------- 音（効果音はその場で合成、声はブラウザの読み上げ） ----------
+let actx = null, master = null;
+function initAudio() {
+  if (actx) { if (actx.state === 'suspended') actx.resume(); return; }
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    actx = new AC();
+    master = actx.createGain();
+    master.gain.value = 0.6;
+    master.connect(actx.destination);
+  } catch (e) { actx = null; }
+}
+function tone(freq, dur, type, vol, slideTo, delay) {
+  if (!soundOn || !actx) return;
+  const t0 = actx.currentTime + (delay || 0);
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(freq, t0);
+  if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, t0 + dur);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol || 0.2, t0 + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g); g.connect(master);
+  o.start(t0); o.stop(t0 + dur + 0.02);
+}
+function noise(dur, vol, delay) {
+  if (!soundOn || !actx) return;
+  const t0 = actx.currentTime + (delay || 0);
+  const n = Math.floor(actx.sampleRate * dur);
+  const buf = actx.createBuffer(1, n, actx.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n);
+  const s = actx.createBufferSource(), g = actx.createGain(), f = actx.createBiquadFilter();
+  s.buffer = buf; f.type = 'lowpass'; f.frequency.value = 900; g.gain.value = vol;
+  s.connect(f); f.connect(g); g.connect(master);
+  s.start(t0);
+}
+const sfx = {
+  move()   { tone(420, 0.04, 'square', 0.05); },
+  rotate() { tone(520, 0.09, 'triangle', 0.16, 900); },                    // クルッ
+  land()   { tone(150, 0.12, 'sine', 0.3, 70); },                          // ポトッ
+  soft()   { tone(190, 0.07, 'sine', 0.14, 110); },
+  hard()   { tone(220, 0.18, 'sine', 0.35, 50); noise(0.12, 0.25); },      // ドスン
+  pop(ch) {                                                                // ポンッ（連鎖で音が上がる）
+    const f = 440 * Math.pow(2, Math.min(ch - 1, 12) * 2 / 12);
+    tone(f, 0.12, 'triangle', 0.22);
+    tone(f * 1.5, 0.16, 'triangle', 0.2, null, 0.07);
+    tone(f * 0.5, 0.2, 'sine', 0.18, f * 2, 0);
+    noise(0.06, 0.1);
+  },
+  fanfare() {                                                              // 大繁盛
+    [523, 659, 784, 1047, 784, 1047].forEach((f, i) => tone(f, i === 5 ? 0.35 : 0.11, 'square', 0.1, null, 0.12 + i * 0.1));
+  },
+  levelUp() { tone(660, 0.1, 'triangle', 0.16, null, 0.3); tone(990, 0.2, 'triangle', 0.16, null, 0.42); },
+  over()    { [392, 330, 262, 196].forEach((f, i) => tone(f, 0.28, 'triangle', 0.2, null, i * 0.22)); },
+};
+
+let jaVoice = null;
+function pickVoice() {
+  try {
+    const vs = speechSynthesis.getVoices();
+    jaVoice = vs.find(v => /^ja/i.test(v.lang)) || null;
+  } catch (e) { jaVoice = null; }
+}
+if ('speechSynthesis' in window) {
+  pickVoice();
+  try { speechSynthesis.addEventListener('voiceschanged', pickVoice); } catch (e) {}
+}
+function speak(text, pitch, rate) {
+  if (!soundOn || !('speechSynthesis' in window)) return;
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'ja-JP';
+    if (jaVoice) u.voice = jaVoice;
+    u.pitch = Math.min(2, pitch || 1);
+    u.rate = rate || 1.15;
+    u.volume = 1;
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
+
+// ---------- メロンの絵 ----------
+function makeSprite(k, px) {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = px;
+  const g = cv.getContext('2d'), K = KINDS[k];
+  const cx = px * 0.5, cy = px * 0.55, R = px * 0.41;
+  // ヘタ
+  g.strokeStyle = '#7a6a3a'; g.lineCap = 'round'; g.lineWidth = px * 0.07;
+  g.beginPath();
+  g.moveTo(cx, cy - R + px * 0.02); g.lineTo(cx, px * 0.07);
+  g.moveTo(cx - px * 0.13, px * 0.07); g.lineTo(cx + px * 0.13, px * 0.07);
+  g.stroke();
+  // 玉
+  const gr = g.createRadialGradient(cx - R * 0.35, cy - R * 0.4, R * 0.1, cx, cy, R);
+  gr.addColorStop(0, K.light); gr.addColorStop(0.55, K.base); gr.addColorStop(1, K.dark);
+  g.fillStyle = gr;
+  g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.fill();
+  // 模様
+  g.save();
+  g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.clip();
+  if (K.pat === 'net') {
+    g.strokeStyle = K.net; g.lineWidth = Math.max(1, px * 0.028);
+    for (let i = -4; i <= 4; i++) {
+      const o = i * R * 0.42;
+      g.beginPath(); g.moveTo(cx + o - R, cy - R); g.quadraticCurveTo(cx + o + R * 0.15, cy, cx + o + R, cy + R); g.stroke();
+      g.beginPath(); g.moveTo(cx + o + R, cy - R); g.quadraticCurveTo(cx + o - R * 0.15, cy, cx + o - R, cy + R); g.stroke();
+    }
+  } else if (K.pat === 'stripe') {
+    g.strokeStyle = K.net; g.lineWidth = Math.max(1, px * 0.035);
+    for (const f of [0.25, 0.6, 0.9]) {
+      g.beginPath(); g.ellipse(cx, cy, R * f, R, 0, 0, Math.PI * 2); g.stroke();
+    }
+  }
+  g.restore();
+  // つや・ふち
+  g.fillStyle = 'rgba(255,255,255,.45)';
+  g.beginPath(); g.ellipse(cx - R * 0.38, cy - R * 0.45, R * 0.22, R * 0.13, -0.6, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = 'rgba(0,0,0,.25)'; g.lineWidth = Math.max(1, px * 0.02);
+  g.beginPath(); g.arc(cx, cy, R - 0.5, 0, Math.PI * 2); g.stroke();
+  return cv;
+}
+
+function resize() {
+  dpr = Math.min(3, window.devicePixelRatio || 1);
+  const availW = window.innerWidth - $('side').offsetWidth - 46;
+  const availH = window.innerHeight - $('top').offsetHeight - $('pad').offsetHeight - $('keys').offsetHeight - 30;
+  cell = Math.max(14, Math.min(56, Math.floor(Math.min(availW / COLS, availH / VIS))));
+  fieldCv.style.width = (COLS * cell) + 'px';
+  fieldCv.style.height = (VIS * cell) + 'px';
+  fieldCv.width = Math.round(COLS * cell * dpr);
+  fieldCv.height = Math.round(VIS * cell * dpr);
+  sprites = KINDS.map((_, k) => makeSprite(k, Math.round(cell * dpr)));
+
+  miniCell = 18;
+  nextCv.style.width = (miniCell * 4) + 'px';
+  nextCv.style.height = (miniCell * 4) + 'px';
+  nextCv.width = Math.round(miniCell * 4 * dpr);
+  nextCv.height = Math.round(miniCell * 4 * dpr);
+  miniSprites = KINDS.map((_, k) => makeSprite(k, Math.round(miniCell * dpr)));
+
+  drawNext();
+  draw();
+}
+
+// ---------- ゲームのきまり ----------
+function newGrid() {
+  grid = []; off = [];
+  for (let r = 0; r < ROWS; r++) { grid.push(new Array(COLS).fill(-1)); off.push(new Array(COLS).fill(0)); }
+}
+function kindCount() { return level >= FIFTH_KIND_LEVEL ? 5 : 4; }
+function randPiece() {
+  const s = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+  const n = kindCount();
+  const a = Math.floor(Math.random() * n), b = Math.floor(Math.random() * n);
+  return { o: !!s.o, cells: s.c.map(p => p.slice()), kinds: [a, a, b, b], x: 3, y: s.y };
+}
+function collide(cells, x, y) {
+  for (const [dx, dy] of cells) {
+    const c = x + dx, r = y + dy;
+    if (c < 0 || c >= COLS || r >= ROWS) return true;
+    if (r >= 0 && grid[r][c] >= 0) return true;
+  }
+  return false;
+}
+function dropInterval() { return Math.max(90, 800 - (level - 1) * 70); }
+function playing() { return phase === 'fall' && !paused && piece; }
+function touchLock() { if (lockResets < 12) { lockTimer = 0; lockResets++; } }
+
+function move(dx) {
+  if (!playing()) return;
+  if (!collide(piece.cells, piece.x + dx, piece.y)) { piece.x += dx; sfx.move(); touchLock(); }
+}
+function rotate(dir) {
+  if (!playing()) return;
+  if (piece.o) {
+    const k = piece.kinds;
+    piece.kinds = dir > 0 ? [k[3], k[0], k[1], k[2]] : [k[1], k[2], k[3], k[0]];
+    sfx.rotate(); touchLock();
+    return;
+  }
+  const nc = piece.cells.map(([x, y]) => dir > 0 ? [-y, x] : [y, -x]);
+  for (const [kx, ky] of KICKS) {
+    if (!collide(nc, piece.x + kx, piece.y + ky)) {
+      piece.cells = nc; piece.x += kx; piece.y += ky;
+      sfx.rotate(); touchLock();
+      return;
+    }
+  }
+}
+function softDrop() {
+  if (!playing()) return;
+  if (!collide(piece.cells, piece.x, piece.y + 1)) { piece.y++; dropTimer = 0; }
+}
+function hardDrop() {
+  if (!playing()) return;
+  while (!collide(piece.cells, piece.x, piece.y + 1)) piece.y++;
+  sfx.hard();
+  lock();
+}
+function ghostY() {
+  let y = piece.y;
+  while (!collide(piece.cells, piece.x, y + 1)) y++;
+  return y;
+}
+
+function lock() {
+  piece.cells.forEach(([dx, dy], i) => {
+    const r = piece.y + dy, c = piece.x + dx;
+    if (r >= 0) grid[r][c] = piece.kinds[i];
+  });
+  piece = null;
+  chain = 0;
+  settleMoved = false;
+  applyGravity();
+  phase = 'settle';
+}
+// 1個ずつバラけて下に落とす
+function applyGravity() {
+  let moved = false;
+  for (let c = 0; c < COLS; c++) {
+    let w = ROWS - 1;
+    for (let r = ROWS - 1; r >= 0; r--) {
+      if (grid[r][c] >= 0) {
+        if (w !== r) {
+          grid[w][c] = grid[r][c]; grid[r][c] = -1;
+          off[w][c] = (w - r) + off[r][c]; off[r][c] = 0;
+          moved = true;
+        }
+        w--;
+      }
+    }
+  }
+  return moved;
+}
+function findGroups() {
+  const seen = [];
+  for (let r = 0; r < ROWS; r++) seen.push(new Array(COLS).fill(false));
+  const groups = [];
+  for (let r = HIDDEN; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (grid[r][c] < 0 || seen[r][c]) continue;
+      const k = grid[r][c], g = [], q = [[r, c]];
+      seen[r][c] = true;
+      while (q.length) {
+        const [y, x] = q.pop();
+        g.push([y, x]);
+        for (const [dy, dx] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const ny = y + dy, nx = x + dx;
+          if (ny < HIDDEN || ny >= ROWS || nx < 0 || nx >= COLS) continue;
+          if (seen[ny][nx] || grid[ny][nx] !== k) continue;
+          seen[ny][nx] = true;
+          q.push([ny, nx]);
+        }
+      }
+      if (g.length >= MIN_LINK) groups.push(g);
+    }
+  }
+  return groups;
+}
+function resolve() {
+  const groups = findGroups();
+  if (!groups.length) { spawnNext(); return; }
+  chain++;
+  if (chain > maxChain) maxChain = chain;
+  clearing = [];
+  groups.forEach(g => g.forEach(p => clearing.push(p)));
+  clearingSet = new Set(clearing.map(([r, c]) => r * COLS + c));
+  const n = clearing.length;
+  score += n * 10 * chain;
+  cleared += n;
+  phase = 'clear';
+  clearTimer = 0;
+  sfx.pop(chain);
+  announce(chain);
+  for (const [r, c] of clearing) burst(r, c, grid[r][c]);
+
+  const nl = 1 + Math.floor(cleared / LEVEL_EVERY);
+  if (nl > level) {
+    const before = level;
+    level = nl;
+    sfx.levelUp();
+    if (before < FIFTH_KIND_LEVEL && level >= FIFTH_KIND_LEVEL) showToast('らいでんメロン入荷！<br>5種類になりました');
+    else showToast('レベル ' + level + '　お客さんが増えてきた');
+  }
+  updateHud();
+}
+function spawnNext() {
+  piece = next;
+  next = randPiece();
+  dropTimer = 0; lockTimer = 0; lockResets = 0;
+  drawNext();
+  if (collide(piece.cells, piece.x, piece.y)) { gameOver(); return; }
+  phase = 'fall';
+}
+function gameOver() {
+  phase = 'over';
+  piece = null;
+  if (score > best) {
+    best = score;
+    try { localStorage.setItem('melonRensaBest', String(best)); } catch (e) {}
+  }
+  updateHud();
+  sfx.over();
+  speak('本日売り切れ', 0.9, 0.95);
+  $('ovTitle').textContent = '本日売り切れ！';
+  $('ovBody').innerHTML =
+    '<p>売上</p><p class="big">' + score.toLocaleString() + ' 円</p>' +
+    '<p>最大 ' + maxChain + ' 連鎖 ／ レベル ' + level + '</p>' +
+    (score >= best && score > 0 ? '<p><b>最高売上を更新！</b></p>' : '<p>最高売上 ' + best.toLocaleString() + ' 円</p>');
+  $('startBtn').textContent = 'もう一回開店';
+  overlay.classList.remove('hide');
+}
+function startGame() {
+  initAudio();
+  newGrid();
+  chain = 0; maxChain = 0; score = 0; level = 1; cleared = 0;
+  particles = []; clearing = []; clearingSet = new Set();
+  paused = false;
+  $('pauseBtn').textContent = '⏸';
+  next = randPiece();
+  overlay.classList.add('hide');
+  updateHud();
+  spawnNext();
+  speak('いらっしゃいませ', 1.1, 1.1);
+}
+function togglePause() {
+  if (phase === 'title' || phase === 'over') return;
+  paused = !paused;
+  $('pauseBtn').textContent = paused ? '▶' : '⏸';
+  if (paused) showToast('ひとやすみ中');
+}
+
+// ---------- 演出 ----------
+function announce(ch) {
+  const line = CHAIN_LINES[Math.min(ch, CHAIN_LINES.length) - 1];
+  banner.innerHTML = (ch >= 2 ? '<b>' + ch + '連鎖！</b>' : '') + '<span>' + line + '</span>';
+  const b = banner.querySelector('b'), s = banner.querySelector('span');
+  if (b) b.style.fontSize = Math.max(18, Math.round(cell * 0.95)) + 'px';
+  if (s) s.style.fontSize = Math.max(14, Math.round(cell * 0.62)) + 'px';
+  banner.classList.remove('show');
+  void banner.offsetWidth;
+  banner.classList.add('show');
+  // 連鎖が増えるほど声を高く、少し早口に
+  speak(line.replace('！', ''), 1 + (ch - 1) * 0.12, 1.1 + Math.min(ch - 1, 6) * 0.04);
+  if (ch >= 5) sfx.fanfare();
+}
+function showToast(html) {
+  toast.innerHTML = html;
+  toast.classList.remove('show');
+  void toast.offsetWidth;
+  toast.classList.add('show');
+}
+function burst(r, c, k) {
+  const K = KINDS[k] || KINDS[0];
+  for (let i = 0; i < 6; i++) {
+    const a = Math.random() * Math.PI * 2, sp = 0.05 + Math.random() * 0.12;
+    particles.push({
+      x: c + 0.5, y: r - HIDDEN + 0.5,
+      vx: Math.cos(a) * sp * 0.06, vy: Math.sin(a) * sp * 0.06 - 0.004,
+      life: 1, color: i % 2 ? K.base : K.light, size: 0.08 + Math.random() * 0.1,
+    });
+  }
+}
+function updateHud() {
+  $('vScore').textContent = score.toLocaleString();
+  $('vBest').textContent = Math.max(best, score).toLocaleString();
+  $('vLevel').textContent = level;
+  $('vChain').textContent = maxChain;
+}
+
+// ---------- 進行 ----------
+function update(dt) {
+  if (phase === 'fall' && piece) {
+    if (collide(piece.cells, piece.x, piece.y + 1)) {
+      lockTimer += dt;
+      if (lockTimer >= LOCK_MS) { sfx.land(); lock(); }
+    } else {
+      lockTimer = 0;
+      dropTimer += dt;
+      if (dropTimer >= dropInterval()) { dropTimer = 0; piece.y++; }
+    }
+  } else if (phase === 'settle') {
+    let moving = false;
+    const d = dt * FALL_SPEED;
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        if (off[r][c] > 0) {
+          off[r][c] = Math.max(0, off[r][c] - d);
+          settleMoved = true;
+          if (off[r][c] > 0) moving = true;
+        }
+      }
+    }
+    if (!moving) {
+      if (settleMoved && chain > 0) sfx.soft();
+      settleMoved = false;
+      resolve();
+    }
+  } else if (phase === 'clear') {
+    clearTimer += dt;
+    if (clearTimer >= CLEAR_MS) {
+      for (const [r, c] of clearing) { grid[r][c] = -1; off[r][c] = 0; }
+      clearing = []; clearingSet = new Set();
+      settleMoved = false;
+      applyGravity();
+      phase = 'settle';
+    }
+  }
+  if (particles.length) {
+    for (const p of particles) {
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 0.00002 * dt; p.life -= dt / 600;
+    }
+    particles = particles.filter(p => p.life > 0);
+  }
+}
+
+function draw() {
+  const g = fctx;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = COLS * cell, H = VIS * cell;
+  g.fillStyle = '#173a26';
+  g.fillRect(0, 0, W, H);
+  g.fillStyle = 'rgba(255,255,255,.035)';
+  for (let r = 0; r < VIS; r++) for (let c = 0; c < COLS; c++) if ((r + c) % 2) g.fillRect(c * cell, r * cell, cell, cell);
+  if (!grid || !sprites.length) return;
+
+  const t = phase === 'clear' ? Math.min(1, clearTimer / CLEAR_MS) : 0;
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const k = grid[r][c];
+      if (k < 0) continue;
+      const x = c * cell, y = (r - HIDDEN - off[r][c]) * cell;
+      if (y + cell <= 0) continue;
+      if (clearingSet.has(r * COLS + c)) {
+        // ふくらんで、光って、しぼむ
+        const s = t < 0.45 ? 1 + 0.25 * Math.sin(t / 0.45 * Math.PI) : Math.max(0, 1 - (t - 0.45) / 0.55);
+        const size = cell * s, o = (cell - size) / 2;
+        g.globalAlpha = Math.floor(t * 12) % 2 ? 0.6 : 1;
+        g.drawImage(sprites[k], x + o, y + o, size, size);
+        g.globalAlpha = 1;
+      } else {
+        g.drawImage(sprites[k], x, y, cell, cell);
+      }
+    }
+  }
+
+  if (piece) {
+    const gy = ghostY();
+    if (gy !== piece.y) {
+      g.globalAlpha = 0.22;
+      piece.cells.forEach(([dx, dy], i) => {
+        const y = (gy + dy - HIDDEN) * cell;
+        if (y + cell > 0) g.drawImage(sprites[piece.kinds[i]], (piece.x + dx) * cell, y, cell, cell);
+      });
+      g.globalAlpha = 1;
+    }
+    piece.cells.forEach(([dx, dy], i) => {
+      const y = (piece.y + dy - HIDDEN) * cell;
+      if (y + cell > 0) g.drawImage(sprites[piece.kinds[i]], (piece.x + dx) * cell, y, cell, cell);
+    });
+  }
+
+  for (const p of particles) {
+    g.globalAlpha = Math.max(0, p.life);
+    g.fillStyle = p.color;
+    g.beginPath(); g.arc(p.x * cell, p.y * cell, p.size * cell, 0, Math.PI * 2); g.fill();
+  }
+  g.globalAlpha = 1;
+
+  if (paused) {
+    g.fillStyle = 'rgba(0,0,0,.45)';
+    g.fillRect(0, 0, W, H);
+  }
+}
+
+function drawNext() {
+  const g = nctx;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, miniCell * 4, miniCell * 4);
+  if (!next || !miniSprites.length) return;
+  let minX = 9, maxX = -9, minY = 9, maxY = -9;
+  for (const [x, y] of next.cells) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
+  const ox = (4 - (maxX - minX + 1)) / 2 - minX, oy = (4 - (maxY - minY + 1)) / 2 - minY;
+  next.cells.forEach(([x, y], i) => {
+    g.drawImage(miniSprites[next.kinds[i]], (x + ox) * miniCell, (y + oy) * miniCell, miniCell, miniCell);
+  });
+}
+
+let lastT = 0;
+function frame(ts) {
+  const dt = Math.min(50, ts - lastT || 16);
+  lastT = ts;
+  if (!paused && phase !== 'title' && phase !== 'over') update(dt);
+  else if (particles.length && phase === 'over') update(dt);
+  draw();
+  requestAnimationFrame(frame);
+}
+
+// ---------- 操作 ----------
+document.addEventListener('keydown', e => {
+  const k = e.key;
+  if (!overlay.classList.contains('hide')) {
+    if (k === 'Enter' || k === ' ') { e.preventDefault(); if (!e.repeat) startGame(); }
+    return;
+  }
+  if (k === 'ArrowLeft') { e.preventDefault(); move(-1); }
+  else if (k === 'ArrowRight') { e.preventDefault(); move(1); }
+  else if (k === 'ArrowDown') { e.preventDefault(); softDrop(); }
+  else if (k === 'ArrowUp' || k === 'x' || k === 'X') { e.preventDefault(); if (!e.repeat) rotate(1); }
+  else if (k === 'z' || k === 'Z') { e.preventDefault(); if (!e.repeat) rotate(-1); }
+  else if (k === ' ') { e.preventDefault(); if (!e.repeat) hardDrop(); }
+  else if (k === 'p' || k === 'P') { togglePause(); }
+});
+
+// 下のボタン（◀ ▼ ▶ は押しっぱなしで連続）
+const ACTS = {
+  left:  { fn: () => move(-1), delay: 170, every: 70 },
+  right: { fn: () => move(1),  delay: 170, every: 70 },
+  down:  { fn: softDrop,       delay: 60,  every: 50 },
+  rot:   { fn: () => rotate(1) },
+  hard:  { fn: hardDrop },
+};
+document.querySelectorAll('#pad button').forEach(btn => {
+  const a = ACTS[btn.dataset.act];
+  let t1 = null, t2 = null;
+  const stop = () => { clearTimeout(t1); clearInterval(t2); t1 = t2 = null; btn.classList.remove('on'); };
+  btn.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    initAudio();
+    stop();
+    btn.classList.add('on');
+    a.fn();
+    if (a.every) t1 = setTimeout(() => { t2 = setInterval(a.fn, a.every); }, a.delay);
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => btn.addEventListener(ev, stop));
+  btn.addEventListener('contextmenu', e => e.preventDefault());
+});
+
+// 置き場を直接さわる：なぞって動かす／ポンと触ると回る
+let drag = null;
+fieldCv.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  initAudio();
+  drag = { x: e.clientX, y: e.clientY, t: performance.now(), moved: false };
+  try { fieldCv.setPointerCapture(e.pointerId); } catch (err) {}
+});
+fieldCv.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const step = Math.max(18, cell * 0.8);
+  let dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  while (dx >= step)  { move(1);  drag.x += step; dx -= step; drag.moved = true; }
+  while (dx <= -step) { move(-1); drag.x -= step; dx += step; drag.moved = true; }
+  while (dy >= step)  { softDrop(); drag.y += step; dy -= step; drag.moved = true; }
+});
+const endDrag = e => {
+  if (!drag) return;
+  if (e.type === 'pointerup' && !drag.moved && performance.now() - drag.t < 300) rotate(1);
+  drag = null;
+};
+fieldCv.addEventListener('pointerup', endDrag);
+fieldCv.addEventListener('pointercancel', endDrag);
+
+$('startBtn').addEventListener('click', startGame);
+$('pauseBtn').addEventListener('click', togglePause);
+$('soundBtn').addEventListener('click', () => {
+  soundOn = !soundOn;
+  $('soundBtn').textContent = soundOn ? '🔊' : '🔇';
+  if (soundOn) { initAudio(); sfx.rotate(); }
+  else { try { speechSynthesis.cancel(); } catch (e) {} }
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && phase !== 'title' && phase !== 'over' && !paused) togglePause();
+});
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', () => setTimeout(resize, 200));
+
+newGrid();
+updateHud();
+resize();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
